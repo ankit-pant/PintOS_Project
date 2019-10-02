@@ -1,0 +1,14 @@
+\contentsline {section}{\numberline {1}Introduction}{1}
+\contentsline {section}{\numberline {2}Building and Running Pintos}{1}
+\contentsline {subsection}{\numberline {2.1}Approach / Strategies}{1}
+\contentsline {subsection}{\numberline {2.2}Files Modified/Added}{1}
+\contentsline {subsubsection}{\numberline {2.2.1}For Set-up}{1}
+\contentsline {subsubsection}{\numberline {2.2.2}For "Hello Pintos" output}{2}
+\contentsline {subsection}{\numberline {2.3}Challenges}{2}
+\contentsline {section}{\numberline {3}Pre-emption of threads}{2}
+\contentsline {subsection}{\numberline {3.1}Approach / Strategies (including challenges)}{2}
+\contentsline {subsection}{\numberline {3.2}Files Modified}{6}
+\contentsline {section}{\numberline {4}Implementation of Priority Scheduling}{6}
+\contentsline {subsection}{\numberline {4.1}Approach / Strategies (including challenges)}{7}
+\contentsline {subsection}{\numberline {4.2}Files Modified}{9}
+\contentsline {section}{\numberline {5}Implementation of Advanced scheduler (MLFQS)[Bonus]}{9}

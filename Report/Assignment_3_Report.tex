@@ -1,0 +1,188 @@
+\documentclass[]{article}
+\usepackage{float}
+\usepackage{graphicx}
+
+\pagenumbering{roman}
+% Title Page
+\title{Report for Operating Systems Assignment-III\\Pintos (Scheduling)}
+\author{By: 2018201035 and 2018201055}
+\date{}
+
+
+\begin{document}
+\maketitle
+\newpage
+\tableofcontents
+\listoffigures
+\newpage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\renewcommand{\thefigure}{\thesection-\arabic{figure}}
+\section{Introduction}
+	Pintos is a simple operating system framework for the 80x86 architecture. It supports kernel threads, loading and running user programs, and a file system, but it implements all of these in a very simple way\cite{1}.\\ 
+	In the assignment it was required that the following was implemented:
+	\begin{enumerate}
+		\item Build Pintos and set it up running in an emulator (preferably QEMU) and run a test program hello.c
+		\item Construct a basic pre-emptive scheduler by circumventing the busy-wait approach already used.
+		\item Implementation of priority scheduling
+		\item Implementation of Advanced scheduler (MLFQS) \textbf{[Bonus]}
+	\end{enumerate}
+	The various steps taken to extend the functionality of the Pintos OS as well as other details like strategies explored and challenges faced are described in the following sections.
+	
+\section{Building and Running Pintos}
+	The first task was to set up Pintos and have it running on a simulator (preferably QEMU). The following sub-sections describe it in greater detail.
+	\subsection{Approach / Strategies}
+		Building and running Pintos	was achieved by following the guide on Pintos which also contained a description of the assignment\cite{2}. It largely involved modifying/appending to certain files that facilitate building of the Pintos Operating System.\\
+		Following which, to have a custom-test case run \textit{(Display Hello Pintos whose code is contained in a file hello.c)} when Pintos boots, various sub-directories/files within the \textit{pintos/src/} directory were examined, especially the files in \textit{pintos/src/tests/threads/} sub-directory. It was realised that if the files that run other test-cases were modified to include the requisite custom test-case, the desired output could be achieved without getting into a more complex task of defining a file-system to enable running of user programs. A file \textit{hello.ck} was also added defining the rules that make evaluation of this test-case (Display Hello Pintos) possible by the \textit{make check} command.
+	\subsection{Files Modified/Added}
+		\subsubsection{For Set-up}
+			\begin{enumerate}
+				\item \begin{verbatim}
+				~/pintos/src/utils/pintos-gdb
+				\end{verbatim}
+				\item \begin{verbatim}
+				~/pintos/src/threads/Make.vars
+				\end{verbatim}
+				\item \begin{verbatim}
+				~/pintos/src/utils/pintos
+				\end{verbatim}		
+				\item \begin{verbatim}
+				~/pintos/src/utils/Pintos.pm
+				\end{verbatim}	
+			\end{enumerate}
+		
+		\subsubsection{For "Hello Pintos" output}
+			\begin{enumerate}
+				\item \begin{verbatim}
+				~/pintos/src/tests/threads/Make.tests 
+				\end{verbatim}
+				\item \begin{verbatim}
+				~/pintos/src/tests/threads/hello.c
+				\end{verbatim}
+				\item \begin{verbatim}
+				~/pintos/src/tests/threads/hello.ck
+				\end{verbatim}
+				\item \begin{verbatim}
+				~/pintos/src/tests/threads/tests.c
+				\end{verbatim}
+				\item \begin{verbatim}
+				~/pintos/src/tests/threads/tests.h
+				\end{verbatim}
+			\end{enumerate}	
+	
+	\subsection{Challenges}
+		\begin{enumerate}
+			\item The link of the source code of Pintos (provided in the assignment document), turned out to be incompatible with the latest version of perl \textit{(perl 5 version 26)} installed in most machines (compilation error was generated when trying to build the source). It was partly resolved by fixing the source code in the file \textit{~/pintos/src/utils/pintos} (line 911 changing hex-value to \^\/V). However, it resulted in a triple fault while booting. \\The final resolution that made building and running possible was to use the latest Pintos source code (which was shared the following day by the TAs).
+			\item Setting up and configuring \textit{bochs} simulator turned out to be very cumbersome. However the effort was abandoned midway since QEMU was the emulator that was recommended to run Pintos.
+		\end{enumerate}
+	
+
+\section {Pre-emption of threads}
+	Since Pintos by default used busy-waiting instead of pre-emption of a sleeping thread, the task was to modify the source to add the feature of pre-emption of sleeping threads so that while a thread sleeps, some other thread could be run instead which prevents the wastage of CPU cycles. The following sub-sections describe it in greater detail.
+	\subsection{Approach / Strategies (including challenges)}
+		To achieve the desired functionality, two approaches were tried.\\
+		Firstly the execution flow was mapped using the functions defined in the file \textit{~/pintos/src/threads/init.c}. The basic execution flow-diagram of the same is given as  \\
+		\begin{figure}[H]
+			\centering
+			\includegraphics[scale=0.275]{"main_pintos"}
+			\caption{Basic execution flow: init.c}
+		\end{figure}
+		
+		Secondly since the assignment mentioned modification of \textit{timer\_sleep} method in the file \textit{~/pintos/src/devices/timer.c}, the initial modifications were made only on that function. The execution flow was studied using various \textit{printf} statements to understand how the code worked. It turned out to be a flawed approach (based on the incorrect inference that on leaving the \textit{timer\_sleep} method, through a call to another function, the thread execution always returns back to \textit{timer\_sleep}) and the subsequent changes made to the method failed one way or another. The changes made were:
+		\begin{itemize}
+			\item The first approach tried was to yield the thread by placing in the ready queue and if the thread was again scheduled for execution, if the time it needs to wait had not elapsed, place it again in the ready queue.\\
+			This lead to failure of test cases as it caused out of order execution as illustrated in the following figures. The left side window is the "success" output while the right window shows the failed output obtained (Some additional output is generated using \textit{printf} statements to help understand the execution).
+			\begin{figure}[H]
+				\centering
+				\includegraphics[scale=0.28]{"timerOutOfOrder1"}
+				\caption{Out of Order Execution(1)}
+			\end{figure}
+			\begin{figure}[H]
+				\centering
+				\includegraphics[scale=0.28]{"timerOutOfOrder2"}
+				\caption{Out of Order Execution(2)}
+			\end{figure}
+			\item The second approach tried was to block the thread and then placing it at the end of the ready queue and unblocking it by defining a condition in \textit{timer\_sleep} that unblocked the thread when it had slept for the required time.\\
+			This approach failed as the \textit{timer\_sleep} function was not getting called by the bocked thread that made it impossible to unblock the thread resulting in the thread unable to execute further.This fate was met by all the threads and none of them executed further evoking the need to manually terminate the simulation. The output obtained in using this approach is shown in the figure below.
+			\begin{figure}[H]
+				\centering
+				\includegraphics[scale=0.3]{"timerThreadUnblockFailure"}
+				\caption{Thread unblocking failed}
+			\end{figure}
+		\end{itemize}
+		
+		Thirdly it was realised (due to the aforementioned failed attempt) that the blocked should be unblocked in a function that is executed all the time. \textit{timer\_interrupt} is a function which runs at each timer tick thus it was a suitable candidate to call the method to unblock the blocked thread. The next problem was to figure out how to store information regarding the sleeping time remaining of a thread as well as maintaining a list to store all the threads that have been blocked. The solution implemented is as follows:
+		\begin{itemize}
+			\item The thread structure \textit{struct thread} was modified and a field was added to keep track of how much time the thread needs to sleep
+			\item A waiting-list was defined which stored all blocked threads
+			\item In the \textit{timer\_sleep} function, the threads that executed this function were blocked and put in the waiting list.
+			\item A comparator function was defined that compared the times each thread needed to sleep for
+			\item In the \textit{timer\_interrupt} function, code to find the thread to be woken-up was added and the chosen thread was un-blocked (which put it in the ready queue for scheduling)
+		\end{itemize}
+		\begin{figure}[H]
+			\centering
+			\includegraphics[scale=0.3]{"OutputInterruptPrints1"}
+			\caption{Output illustrating the running of timer (function \textit{timer\_interrupt})}
+		\end{figure}
+	\subsection{Files Modified}
+		\begin{enumerate}
+				\item \begin{verbatim}
+			~/pintos/src/threads/thread.h 
+			\end{verbatim}
+			\item \begin{verbatim}
+			~/pintos/src/devices/timer.c
+			\end{verbatim}
+		\end{enumerate}	
+
+\section{Implementation of Priority Scheduling}
+	This part required an implementation of a basic priority scheduling scheme. It was required that if a thread was created with a higher/lower priority or if it changed priority during runtime, it must be scheduled or should yield according to its priority. The following sub-sections describe it in greater detail.
+	\subsection{Approach / Strategies (including challenges)}
+		Firstly since the problem statement required modification of the scheduler, an attempt was made to modify the \textit{next\_thread\_to\_run()} function which is called by the \textit{schedule()} function. The \textit{next\_thread\_to\_run()} function chooses the next thread to run by popping the thread at the front of the ready-list. The modification made was to choose the thread of the highest priority to run next. However contrary to expectation, it resulted in Pintos unable to boot (the booting process was stuck while the operation that calibrates the timer).  Later it was found the approach failed as the modifications made to \textit{next\_thread\_to\_run()} function, did return the correct thread to run, however it did not remove that thread from the ready queue, hence the result was that the same thread was running again and again leading to boot failure.\\
+		The second approach that was tried was to insert the threads in the ready queue according to the order of their priority (highest priority thread was inserted to the front of the queue and so on). This approach synced well with the \textit{next\_thread\_to\_run()} function as this function picks the next thread to schedule from the front of the queue and due to the modifications in the thread insertion (in the ready queue) method, the highest priority thread was always scheduled as the next thread to run. The solution implemented is as follows (by making changes to the \textit{thread.c} file):
+		\begin{itemize}
+			\item A comparator function (\textit{thread\_compare\_priority}) was defined that was used to compare the priorities of two threads (to support orderly insertions into the ready queue)
+			\item The \textit{thread\_ticks} function was modified to allow for pre-emption of currently running thread if its priority is no longer the highest
+			\item The \textit{thread\_create} function was modified so that if the created thread has a higher priority than the currently running thread, it will pre-empt the current running thread
+			\item The \textit{thread\_unblock} function was modified so that the thread that unblocks is inserted into the ready-queue according to the priority of the thread
+			\item The \textit{thread\_yield} function was modified so that the thread that yields the CPU is inserted back into the ready-queue according to the priority of the thread
+			\item The \textit{thread\_set\_priority} function was modified so that if the priority of a thread is modified at runtime, it is scheduled/pre-empted based on the new priority value
+		\end{itemize}
+		After making the aforementioned changes some more modifications were required to make the priority scheduling work with the semaphore mechanism as well as the monitor (\textit{COND} signalling mechanism).\\
+		The following changes were made to support the additional requirement of making the priority scheduler work with semaphores:
+		\begin{itemize}
+			\item The \textit{sema\_down} and \textit{sema\_up} functions were examined and output statements (using \textit{printf()}) were added to know more about their working. These functions were called by the \textit{lock\_acquire} and \textit{lock\_release} functions respectively which was in turn called by the  \textit{allocate\_tid} function in the \textit{thread.c} file
+			\item Following this the \textit{sema\_down} function was modified by inserting the semaphore in the \textit{sema$\rightarrow$waiters} list in an orderly fashion. Since the semaphore priority was the same as the thread priority (found out by examining the \textit{priority-sema.c} file), the \textit{thread\_compare\_priority} function was reused from \textit{thread.c} file. In order to reuse this comparator function, it was declared in the \textit{thread.h} file (which \textit{synch.c} file imported)
+			\item The \textit{sema\_up} function was then modified. Firstly to check which thread was being woken up, its \textit{tid} was printed. On examining this output it was found that though the threads were removed in the correct order from the \textit{sema$\rightarrow$waiters} list, they were not executing in correct order because at that time some other thread was running and it was not yielding control to the higher priority thread just removed from the \textit{sema$\rightarrow$waiters} list.
+			\item To remedy this situation, the changes made to the \textit{thread\_tick} function in \textit{thread.c} (pre-empting current running thread if its priority is less than a thread in the \textit{ready\_list}) were modularised into a function called\\ \textit{is\_thread\_preempt\_required} and also declared in the \textit{thread.h} file
+			\item The \textit{is\_thread\_preempt\_required} function was then called in the \textit{sema\_up} function to check if the thread removed from the \textit{sema$\rightarrow$waiters} list has a higher priority than the current running thread. If it does, the current running thread yields the CPU
+		\end{itemize}
+		The following changes were made to support the additional requirement of making the priority scheduler work with monitor:
+		\begin{itemize}
+			\item Since the \textit{cond\_wait} function also inserted elements into the \textit{cond$\rightarrow$waiters} list, the function was modified to insert the elements in order. On examining the \textit{priority-condvar.c} file it was found that the priority of the condition variable was the same as the priority of that thread (current thread). Thus it was decided to use the same function that compares thread priorities to help insert into the \textit{cond $\rightarrow$ waiters} list in order. However since the elements of the list \textit{cond$\rightarrow$waiters} were of the \textit{semaphore\_elem} type, the comparator function did not work
+			\item To resolve this issue, another field (\textit{int sema\_priority}) was added to the \textit{semaphore\_elem} structure to store the priority which will be used for ordered insertions to the \textit{cond$\rightarrow$waiters} list. Another comparator function (\textit{waiter\_compare\_priority}) was written to compare the priorities of two \textit{semaphore\_elem} elements.
+			\item Then the \textit{cond\_wait} function was modified to first assign the priority to the \textit{semaphore\_elem} element and then insert into the \textit{cond$\rightarrow$waiters} list in an orderly manner
+		\end{itemize}
+		
+	
+	\subsection{Files Modified}
+		\begin{enumerate}
+			\item \begin{verbatim}
+				~/pintos/src/devices/thread.c
+			\end{verbatim}
+			\item \begin{verbatim}
+				~/pintos/src/threads/thread.h
+			\end{verbatim}
+			\item \begin{verbatim}
+				~/pintos/src/threads/synch.c
+			\end{verbatim}
+		\end{enumerate}	
+	
+\section{Implementation of Advanced scheduler (MLFQS)[Bonus]}
+	The Advanced Scheduler (MLFQS) was not implemented.	
+	
+	
+\begin{thebibliography}{bib}
+	\bibitem{1} Ben Pfaff et al.\\ https://web.stanford.edu/class/cs140/projects/pintos/pintos.html
+	\bibitem{2} Ben Pfaff et al.\\ https://web.stanford.edu/class/cs140/projects/pintos/pintos\_1.html\#SEC2
+\end{thebibliography}
+\end{document}          
